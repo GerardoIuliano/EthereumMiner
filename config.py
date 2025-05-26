@@ -1,10 +1,10 @@
 # config.py
 
-ETHERSCAN_API_KEY = "your_etherscan_api_key_here"
+ETHERSCAN_API_KEY = "ZHE89QQIFUUYKIHPN9IRCRA7C8Y4C3S7G5"
 ETHERSCAN_API_URL = "https://api.etherscan.io/api"
-ETHERSCAN_RATE_LIMIT_DELAY = 0.25  # In secondi
+ETHERSCAN_RATE_LIMIT_DELAY = 0.1  # In secondi
 
-INFURA_API_KEY = "your_infura_api_key_here"
+INFURA_API_KEY = "6b3d34e150c44474ad0715ca84b53aef"
 
 COUNTER_LIMIT = {
     "0_4": 1000,

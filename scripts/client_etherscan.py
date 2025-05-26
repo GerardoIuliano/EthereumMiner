@@ -54,6 +54,14 @@ class EtherscanClient:
         else:
             print("Error:", "get_transaction_receipt: Transaction not found", tx_hash)   
             return None
+    
+    def get_transaction(self, tx_hash):
+        result = self._make_request("proxy", "eth_getTransactionByHash", {"txhash": tx_hash})
+        if result["result"] is not None:        
+            return result["result"]
+        else:
+            print("Error:", "get_transaction: Transaction not found", tx_hash)   
+            return None
         
     def isAContractDeployment(self, tx):
         if tx["to"] is None:

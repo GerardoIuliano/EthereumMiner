@@ -7,6 +7,7 @@ class Web3Client:
         self.w3 = Web3(Web3.HTTPProvider("https://mainnet.infura.io/v3/"+api_key))
 
     def get_bytecode(self, address):
+        #runtime bytecode
         bytecode = self.w3.eth.get_code(Web3.to_checksum_address(address))
         return bytecode.hex()
 

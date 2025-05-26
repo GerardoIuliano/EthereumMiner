@@ -1,4 +1,6 @@
-import re
+import re, json
+from eth_abi import decode
+from eth_utils import remove_0x_prefix
 
 def get_pragma_from_code(source_code: str) -> str:
     """
@@ -29,6 +31,18 @@ def get_compiler_version(compiler_version: str) -> str:
         return match.group(1)
     return None
 
+def isAbiAvailable(abi: str, contract_address) -> bool:
+    """
+    Controlla se l'ABI è disponibile.
+    :param abi: ABI del contratto
+    :return: True se l'ABI è disponibile, False altrimenti
+    """
+    if abi is None or abi == "":
+        print(f"✗ Skipped {contract_address}: ABI not available. ABI: {abi}")
+        return False
+    else: 
+        return True
+    
 def is_same_version(source_code: str, compiler_version: str, contract_address) -> str:
     """
     Controlla se la versione del compilatore corrisponde a quella del codice sorgente.
@@ -66,7 +80,8 @@ def isLibraryEmpty(library: str, contract_address) -> bool:
     
 def check_source_and_byte(
     source_code: str,   # Codice sorgente del contratto
-    bytecode: str,      # Bytecode del contratto
+    runtime_bytecode: str,      # Bytecode del contratto
+    creation_bytecode: str,  # Bytecode di creazione del contratto
     contract_address: str   # Indirizzo del contratto 
 ):
     """
@@ -76,19 +91,136 @@ def check_source_and_byte(
     :return: None
     """
     # Controlla che source code e bytecode non siano nulli o vuoti
-    if source_code and bytecode:
+    if source_code and runtime_bytecode:
         return True
     else:
         if source_code is None or source_code == "":
             print(f"✗ Skipped {contract_address}: source code missing. Source code: {source_code}")
-        if bytecode is None or bytecode == "":    
-            print(f"✗ Skipped {contract_address}: bytecode missing. Bytecode: {bytecode}")
+        if runtime_bytecode is None or runtime_bytecode == "":    
+            print(f"✗ Skipped {contract_address}: runtime bytecode missing. Runtime bytecode: {runtime_bytecode}")
+        if creation_bytecode is None or creation_bytecode == "":
+            print(f"✗ Skipped {contract_address}: creation bytecode missing. Creation bytecode: {creation_bytecode}")
         return False
     
+# def decode_constructor_args(abi, constructor_arguments_hex):
+#     # Assicurati che l'ABI sia un oggetto Python
+#     if isinstance(abi, str):
+#         abi = json.loads(abi)
+
+#     # Trova l'entry del costruttore
+#     constructor_abi = next((entry for entry in abi if entry.get("type") == "constructor"), None)
+#     if not constructor_abi or not constructor_abi.get("inputs"):
+#         return {}
+
+#     # Estrai tipi degli input
+#     input_types = [inp["type"] for inp in constructor_abi["inputs"]]
+
+#     # Pulisci la stringa hex
+#     constructor_arguments_hex = constructor_arguments_hex.lower().removeprefix("0x")
+#     constructor_args_bytes = bytes.fromhex(constructor_arguments_hex)
+
+#     # Decodifica
+#     decoded = decode(input_types, constructor_args_bytes)
+
+#     # Crea un dizionario nome -> valore
+#     decoded_named = {
+#         inp["name"] or f"arg{i}": value
+#         for i, (inp, value) in enumerate(zip(constructor_abi["inputs"], decoded))
+#     }
+
+#     return decoded_named
+
+# def decode_constructor_args(abi, constructor_arguments_hex):
+#     """
+#     Decodifica i constructor arguments dati ABI e dati esadecimali.
+
+#     :param abi: la lista ABI completa (come JSON/dict)
+#     :param constructor_arguments_hex: stringa esadecimale dei parametri del costruttore (es. da bytecode)
+#     :return: lista dei valori decodificati
+#     """
+#     if isinstance(abi, str):
+#         abi = json.loads(abi)
+
+#     constructor = next((item for item in abi if item.get("type") == "constructor"), None)
+#     if constructor is None:
+#         raise ValueError("ABI does not contain a constructor")
+
+#     input_types = []
+
+#     def parse_type(input_item):
+#         if input_item["type"] == "tuple":
+#             component_types = [parse_type(c) for c in input_item["components"]]
+#             return f"({','.join(component_types)})"
+#         elif input_item["type"].startswith("tuple["):
+#             # Gestione tuple[] o tuple[n]
+#             dimensions = input_item["type"][5:]  # es: "[3]" o "[]"
+#             component_types = [parse_type(c) for c in input_item["components"]]
+#             return f"({','.join(component_types)}){dimensions}"
+#         else:
+#             return input_item["type"]
+
+#     for item in constructor["inputs"]:
+#         input_types.append(parse_type(item))
+
+#     # Converti hex in bytes
+#     constructor_args_bytes = bytes.fromhex(remove_0x_prefix(constructor_arguments_hex))
+
+#     # Decodifica
+#     decoded = decode(input_types, constructor_args_bytes)
+
+#     return decoded
+
+def decode_constructor_args(abi, constructor_arguments_hex):
+    """
+    Decodifica i constructor arguments dati ABI e dati esadecimali.
+
+    :param abi: la lista ABI completa (come JSON/dict)
+    :param constructor_arguments_hex: stringa esadecimale dei parametri del costruttore (es. da bytecode)
+    :return: dizionario {nome_parametro: valore_decodificato}
+    """
+    if isinstance(abi, str):
+        abi = json.loads(abi)
+
+    constructor = next((item for item in abi if item.get("type") == "constructor"), None)
+    if constructor is None:
+        raise ValueError("ABI does not contain a constructor")
+
+    input_types = []
+
+    def parse_type(input_item):
+        if input_item["type"] == "tuple":
+            component_types = [parse_type(c) for c in input_item["components"]]
+            return f"({','.join(component_types)})"
+        elif input_item["type"].startswith("tuple["):
+            dimensions = input_item["type"][5:]  # es: "[3]" o "[]"
+            component_types = [parse_type(c) for c in input_item["components"]]
+            return f"({','.join(component_types)}){dimensions}"
+        else:
+            return input_item["type"]
+
+    for item in constructor["inputs"]:
+        input_types.append(parse_type(item))
+
+    constructor_args_bytes = bytes.fromhex(remove_0x_prefix(constructor_arguments_hex))
+    decoded_values = decode(input_types, constructor_args_bytes)
+
+    # Associa ogni valore al nome
+    named_values = {}
+    for item, value in zip(constructor["inputs"], decoded_values):
+        if item["type"].startswith("tuple"):
+            # Se è una tupla, associare anche i nomi interni
+            component_names = [c["name"] for c in item["components"]]
+            named_values[item["name"]] = dict(zip(component_names, value))
+        else:
+            named_values[item["name"]] = value
+
+    return named_values
+
 def is_candidate(
     contract_address: str,  # Indirizzo del contratto
     source_code: str,   # Codice sorgente del contratto
-    bytecode: str,      # Bytecode del contratto
+    runtime_bytecode: str,      # Runtime_bytecode del contratto
+    creation_bytecode: str,  # Creation_bytecode di creazione del contratto
     compiler_version: str,  # Versione del compilatore
     library: str    # Librerie
 ):
@@ -100,7 +232,7 @@ def is_candidate(
     :param library: Librerie
     :return: None
     """
-    if check_source_and_byte(source_code, bytecode, contract_address):
+    if check_source_and_byte(source_code, runtime_bytecode, creation_bytecode, contract_address):
         if is_same_version(source_code, compiler_version, contract_address):
             if isLibraryEmpty(library, contract_address):
                 # Se tutte le condizioni sono soddisfatte, il contratto è valido
