@@ -1,0 +1,6 @@
+RUN 1
+
+main.py --start-block 22573538 --end-block 22073538 --threads 3
+
+Stopped after 200,000 API calls. 
+

@@ -1,5 +1,6 @@
 import re, json
 from eth_abi import decode
+from scripts.client_web3 import Web3Client
 from eth_utils import remove_0x_prefix
 
 def get_pragma_from_code(source_code: str) -> str:
@@ -101,74 +102,6 @@ def check_source_and_byte(
         if creation_bytecode is None or creation_bytecode == "":
             print(f"✗ Skipped {contract_address}: creation bytecode missing. Creation bytecode: {creation_bytecode}")
         return False
-    
-# def decode_constructor_args(abi, constructor_arguments_hex):
-#     # Assicurati che l'ABI sia un oggetto Python
-#     if isinstance(abi, str):
-#         abi = json.loads(abi)
-
-#     # Trova l'entry del costruttore
-#     constructor_abi = next((entry for entry in abi if entry.get("type") == "constructor"), None)
-#     if not constructor_abi or not constructor_abi.get("inputs"):
-#         return {}
-
-#     # Estrai tipi degli input
-#     input_types = [inp["type"] for inp in constructor_abi["inputs"]]
-
-#     # Pulisci la stringa hex
-#     constructor_arguments_hex = constructor_arguments_hex.lower().removeprefix("0x")
-#     constructor_args_bytes = bytes.fromhex(constructor_arguments_hex)
-
-#     # Decodifica
-#     decoded = decode(input_types, constructor_args_bytes)
-
-#     # Crea un dizionario nome -> valore
-#     decoded_named = {
-#         inp["name"] or f"arg{i}": value
-#         for i, (inp, value) in enumerate(zip(constructor_abi["inputs"], decoded))
-#     }
-
-#     return decoded_named
-
-# def decode_constructor_args(abi, constructor_arguments_hex):
-#     """
-#     Decodifica i constructor arguments dati ABI e dati esadecimali.
-
-#     :param abi: la lista ABI completa (come JSON/dict)
-#     :param constructor_arguments_hex: stringa esadecimale dei parametri del costruttore (es. da bytecode)
-#     :return: lista dei valori decodificati
-#     """
-#     if isinstance(abi, str):
-#         abi = json.loads(abi)
-
-#     constructor = next((item for item in abi if item.get("type") == "constructor"), None)
-#     if constructor is None:
-#         raise ValueError("ABI does not contain a constructor")
-
-#     input_types = []
-
-#     def parse_type(input_item):
-#         if input_item["type"] == "tuple":
-#             component_types = [parse_type(c) for c in input_item["components"]]
-#             return f"({','.join(component_types)})"
-#         elif input_item["type"].startswith("tuple["):
-#             # Gestione tuple[] o tuple[n]
-#             dimensions = input_item["type"][5:]  # es: "[3]" o "[]"
-#             component_types = [parse_type(c) for c in input_item["components"]]
-#             return f"({','.join(component_types)}){dimensions}"
-#         else:
-#             return input_item["type"]
-
-#     for item in constructor["inputs"]:
-#         input_types.append(parse_type(item))
-
-#     # Converti hex in bytes
-#     constructor_args_bytes = bytes.fromhex(remove_0x_prefix(constructor_arguments_hex))
-
-#     # Decodifica
-#     decoded = decode(input_types, constructor_args_bytes)
-
-#     return decoded
 
 def decode_constructor_args(abi, constructor_arguments_hex):
     """
@@ -178,6 +111,8 @@ def decode_constructor_args(abi, constructor_arguments_hex):
     :param constructor_arguments_hex: stringa esadecimale dei parametri del costruttore (es. da bytecode)
     :return: dizionario {nome_parametro: valore_decodificato}
     """
+    if constructor_arguments_hex is None or constructor_arguments_hex == '':
+        return ""
     if isinstance(abi, str):
         abi = json.loads(abi)
 
@@ -200,8 +135,10 @@ def decode_constructor_args(abi, constructor_arguments_hex):
 
     for item in constructor["inputs"]:
         input_types.append(parse_type(item))
-
-    constructor_args_bytes = bytes.fromhex(remove_0x_prefix(constructor_arguments_hex))
+    if constructor_arguments_hex.startswith("0x"):
+        constructor_args_bytes = bytes.fromhex(remove_0x_prefix(constructor_arguments_hex))
+    else:
+        constructor_args_bytes = constructor_arguments_hex
     decoded_values = decode(input_types, constructor_args_bytes)
 
     # Associa ogni valore al nome
@@ -241,5 +178,15 @@ def is_candidate(
                 return False
         else:
             return False
+    else:
+        return False
+    
+def skipVersion(skip_version, source_code):
+    pragma_version = get_pragma_from_code(source_code)
+    version = pragma_version.replace(".", "_")
+    # From 0_8_30 to 0_8
+    version_folder = "_".join(version.split("_")[:2])  # Es. 0_8
+    if skip_version == version_folder:
+        return True
     else:
         return False
