@@ -18,11 +18,11 @@ def process_block_range(start_block, end_block, file_counter, lock):
     while start_block >= end_block:
         try:
             print("Scanning Block:", start_block)
-            transactions = clientEth.get_transactions_from_block(start_block)
-            try:
-                for tx in transactions:
-                    # Aggiungi protezione con Lock per l'accesso sicuro al file_counter
-                    with lock:
+            # Aggiungi protezione con Lock per l'accesso sicuro
+            with lock:
+                transactions = clientEth.get_transactions_from_block(start_block)
+                try:
+                    for tx in transactions:
                         if clientEth.isAContractDeployment(tx):
                             id_transaction = tx["hash"]
                             tx_receipt = clientEth.get_transaction_receipt(id_transaction)      
@@ -86,8 +86,8 @@ def process_block_range(start_block, end_block, file_counter, lock):
                                     )
                             else:
                                 print(f"✗ Skipped version: {version_to_skip}") 
-            except Exception as e:
-                print(f"An error occurred in transaction {tx['hash']}: {traceback.print_exc()}") 
+                except Exception as e:
+                    print(f"An error occurred in transaction {tx['hash']}: {traceback.print_exc()}") 
         except Exception as e:
             print(f"An error occurred in block {start_block}: {e}\n{traceback.print_exc()}") 
         except KeyboardInterrupt:
